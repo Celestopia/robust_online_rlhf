@@ -1,0 +1,5 @@
+# Ignore all __pycache__ directories, experimient result data, jupyter notebook scripts, and other specified files.
+__pycache__/
+results/
+*.ipynb
+others/
