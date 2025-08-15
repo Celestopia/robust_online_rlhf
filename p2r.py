@@ -2,13 +2,18 @@
 import numpy as np
 import random
 import logging
-from constants import GRID_SIZE, STATE_DIM, ACTION_DIM, EPISODE_LENGTH
-from utils import logistic, logistic_derivative
+from constants import GRID_SIZE, STATE_DIM, ACTION_DIM, TRAJECTORY_LENGTH
+from utils.functions import logistic, logistic_derivative
 from env import SimulatedOracle
 
 
 class P2R_Interface:
-    """P2R interface for (s,a) preferences."""
+    """
+    P2R interface for (s,a) preferences.
+    
+    Reference: Is RLHF More Difficult than Standard RL? A Theoretical Perspective,
+        https://proceedings.neurips.cc/paper_files/paper/2023/hash/efb9629755e598c4f261c44aeb6fde5e-Abstract-Conference.html
+    """
     def __init__(self, state_dim:int, action_dim:int, oracle:SimulatedOracle,
                     m_repeats:int=10000,
                     epsilon_0:float=0.01,

@@ -1,11 +1,9 @@
 # file: ucbvi.py
 import numpy as np
-import random
 import math
 import logging
 from typing import Callable, Tuple, List
-from constants import GRID_SIZE, STATE_DIM, ACTION_DIM, EPISODE_LENGTH
-from utils import get_variance
+from utils.functions import get_variance
 
 
 
@@ -15,17 +13,17 @@ class UCBVI_BF:
     
     Reference: Minimax Regret Bounds for Reinforcement Learning, https://proceedings.mlr.press/v70/azar17a.
     """
-    def __init__(self, state_dim:int, action_dim:int, episode_num:int, episode_length:int, delta:float=0.1):
+    def __init__(self, state_dim:int, action_dim:int, trajectory_num:int, trajectory_length:int, delta:float=0.1):
         assert type(state_dim) == int, "state_dim must be an integer"
         assert type(action_dim) == int, "action_dim must be an integer"
-        assert type(episode_num) == int, "episode_num must be an integer"
-        assert type(episode_length) == int, "episode_length must be an integer"
+        assert type(trajectory_num) == int, "trajectory_num must be an integer"
+        assert type(trajectory_length) == int, "trajectory_length must be an integer"
         assert type(delta) == float and 0.001 <= delta <= 1.0, "delta must be a float in (0.001, 1.0]"
 
         self.S = state_dim
         self.A = action_dim
-        self.K = episode_num
-        self.H = episode_length
+        self.K = trajectory_num
+        self.H = trajectory_length
         self.T = self.K * self.H
         self.delta = delta
         self.L = np.log(5 * self.S * self.A * self.T / delta)
@@ -107,7 +105,7 @@ class UCBVI_BF:
                         expected_v = P_hat.dot(V[h+1]) # expected value of next state
                         b = self.bonus_2(h, s, a, V[h+1]) # bonus term
                         q = r_hat + expected_v + b
-                        q = min(Q_prev[h,s,a], H, q) # may replace H with H-h for a tighter bound
+                        q = min(Q_prev[h,s,a], H-h, q) # Here H is replaced with H-h for a tighter bound
                     else:
                         q = self.H
                     Q[h, s, a] = q

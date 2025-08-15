@@ -9,7 +9,7 @@ import torch.optim as optim
 
 from typing import Callable, Tuple
 from constants import GRID_SIZE, ACTION_DIM
-from utils import logistic
+from utils.functions import logistic
 
 class GridWorld:
     """
@@ -17,7 +17,7 @@ class GridWorld:
     
     The API is inspired by Gymnasium Documentation, https://gymnasium.farama.org/introduction/create_custom_env/.
     """
-    def __init__(self, size:int=11, p:float=0.9, episode_length_max:int=100):
+    def __init__(self, size:int=11, p:float=0.9, trajectory_length_max:int=100):
         """
         Initialize the grid world.
 
@@ -25,14 +25,14 @@ class GridWorld:
             size (int): The side length of the grid.
             _state (int): The current state of the agent.
             _p (float): The probability of taking the intended action.
-            episode_length (int): The number of steps taken in the current episode.
-            episode_length_max (int): The maximum number of steps in an episode.
+            trajectory_length (int): The number of steps taken in the current episode.
+            trajectory_length_max (int): The maximum number of steps in an episode.
         """
         self.size = size
         self._state = self.position_to_state((0,0))
         self.p = p
-        self.episode_length = 0
-        self.episode_length_max = episode_length_max
+        self.trajectory_length = 0
+        self.trajectory_length_max = trajectory_length_max
         self.reward_model = lambda s, a: 0 # To be implemented later.
 
     def set_reward_model(self, reward_model:Callable[[int, int], float]):
@@ -118,7 +118,7 @@ class GridWorld:
         else:
             self._check_position(position)
             self._state = self.position_to_state(position)
-        self.episode_length = 0
+        self.trajectory_length = 0
         return self.get_state()
     
     def _update_state(self, state:int):
@@ -131,7 +131,7 @@ class GridWorld:
         terminated = False # Whether the agent reaches the target or hit the wall
         truncated = False # Whether the episode is truncated due to time limit
         info = {
-            "episode_length": None,
+            "trajectory_length": None,
             "position": None,
             "action_taken": None,
             "messages": [],
@@ -161,10 +161,10 @@ class GridWorld:
                 x_new, y_new, x_prev, y_prev))
         
         if frozen_state is False: # Normal case, where the state is updated after the action
-            self.episode_length += 1
-            if self.episode_length >= self.episode_length_max:
+            self.trajectory_length += 1
+            if self.trajectory_length >= self.trajectory_length_max:
                 truncated = True
-                info["messages"].append("Episode truncated at step {}.".format(self.episode_length))
+                info["messages"].append("Episode truncated at step {}.".format(self.trajectory_length))
         elif frozen_state is True: # Do not really update the state, just return signals
             terminated = False
             truncated = False
@@ -172,7 +172,7 @@ class GridWorld:
             self._update_state(state_new)
             info["messages"].append("Took a trial action. The state is not updated.")
         
-        info["episode_length"] = self.episode_length
+        info["trajectory_length"] = self.trajectory_length
         info["position"] = self.state_to_position(state_new)
         info["action_taken"] = action_taken
         return self.get_state(), reward, terminated, truncated, info
