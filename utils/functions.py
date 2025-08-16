@@ -1,4 +1,5 @@
 import numpy as np
+from typing import Iterable
 
 def logistic(x, scale=1.0):
     return 1.0 / (1.0 + np.exp(-scale * x))
@@ -6,7 +7,7 @@ def logistic(x, scale=1.0):
 def logistic_derivative(x, scale=1.0):
     return scale * logistic(x, scale=scale) * (1 - logistic(x, scale=scale))
 
-def get_variance(a, p):
+def get_variance(a: Iterable, p: Iterable) -> float:
     """
     Get the variance of a discrete random variable.
 
@@ -23,7 +24,7 @@ def get_variance(a, p):
     a_var = np.dot(p, (a - a_mean) ** 2)
     return a_var
 
-def moving_average_smoothing(data, window_size):
+def moving_average_smoothing(data: np.ndarray, window_size: int) -> np.ndarray:
     assert type(data) == np.ndarray, "data must be a numpy array."
     assert data.ndim == 1, "data must be a 1-dimensional array."
     weights = np.ones(window_size) / window_size

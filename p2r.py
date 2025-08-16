@@ -1,8 +1,6 @@
 # file: p2r.py
 import numpy as np
-import random
 import logging
-from constants import GRID_SIZE, STATE_DIM, ACTION_DIM, TRAJECTORY_LENGTH
 from utils.functions import logistic, logistic_derivative
 from env import SimulatedOracle
 

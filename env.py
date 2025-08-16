@@ -3,12 +3,8 @@ import random
 import copy
 import numpy as np
 import matplotlib.pyplot as plt
-import torch
-import torch.nn as nn
-import torch.optim as optim
 
 from typing import Callable, Tuple
-from constants import GRID_SIZE, ACTION_DIM
 from utils.functions import logistic
 
 class GridWorld:
@@ -17,14 +13,14 @@ class GridWorld:
     
     The API is inspired by Gymnasium Documentation, https://gymnasium.farama.org/introduction/create_custom_env/.
     """
-    def __init__(self, size:int=11, p:float=0.9, trajectory_length_max:int=100):
+    def __init__(self, size: int=11, p: float=0.9, trajectory_length_max: int=100):
         """
         Initialize the grid world.
 
         Attributes:
             size (int): The side length of the grid.
             _state (int): The current state of the agent.
-            _p (float): The probability of taking the intended action.
+            p (float): The probability of taking the intended action.
             trajectory_length (int): The number of steps taken in the current episode.
             trajectory_length_max (int): The maximum number of steps in an episode.
         """
@@ -35,7 +31,7 @@ class GridWorld:
         self.trajectory_length_max = trajectory_length_max
         self.reward_model = lambda s, a: 0 # To be implemented later.
 
-    def set_reward_model(self, reward_model:Callable[[int, int], float]):
+    def set_reward_model(self, reward_model: Callable[[int, int], float]):
         """
         Args:
             reward_model (Callable): A Callable that takes a state-action pair (s, a) and returns a scalar reward.
@@ -60,7 +56,7 @@ class GridWorld:
         assert type(action) == int, "Action must be an integer; got {}.".format(type(action))
         assert 0 <= action <= 4, "Action must be in range [0, 4]; got {}.".format(action)
 
-    def position_to_state(self, position:Tuple[int, int]) -> int:
+    def position_to_state(self, position: Tuple[int, int]) -> int:
         """
         Convert a position (x, y) to a numbered state.
         The left top corner corresponds to state 0. The number increases by 1 for each column and by `self.size` for each row.
@@ -79,16 +75,16 @@ class GridWorld:
         """
         (x, y) = position
         n = self.size // 2
-        return (n + y) * (2 * n + 1) + x + n
+        return (n - y) * (2 * n + 1) + x + n
 
-    def state_to_position(self, state:int) -> Tuple[int, int]:
+    def state_to_position(self, state: int) -> Tuple[int, int]:
         """Convert a numbered state to a position (x, y)."""
         n = self.size // 2
         x = state % (2 * n + 1) - n
-        y = (state - x) // (2 * n + 1) - n
+        y = n - (state // (2 * n + 1))
         return (x, y)
 
-    def action_to_direction(self, action:int) -> Tuple[int, int]:
+    def action_to_direction(self, action: int) -> Tuple[int, int]:
         """Convert a numbered action to a direction (delta_x, delta_y)."""
         map = {
             0: (0,0), # Stay
@@ -99,7 +95,7 @@ class GridWorld:
         }
         return map[action]
 
-    def action_to_char(self, action:int) -> str:
+    def action_to_char(self, action: int) -> str:
         action_to_char_dict = {0: "o", 1: "→", 2: "↑", 3: "←", 4: "↓"}
         return action_to_char_dict[action]
 
@@ -111,7 +107,7 @@ class GridWorld:
         """Return the current position as a tuple (x, y)."""
         return self.state_to_position(self._state)
 
-    def reset(self, position:Tuple[int, int]=None) -> int:
+    def reset(self, position: Tuple[int, int]=None) -> int:
         """Reset the environment to a initial state."""
         if position is None:
             self._state = self.position_to_state((0,0))
@@ -121,11 +117,11 @@ class GridWorld:
         self.trajectory_length = 0
         return self.get_state()
     
-    def _update_state(self, state:int):
+    def _update_state(self, state: int):
         """Update the current state with the given state."""
         self._state = state
 
-    def step(self, action:int, frozen_state:bool=False) -> Tuple[int, float, bool, bool, dict]:
+    def step(self, action: int, frozen_state: bool=False) -> Tuple[int, float, bool, bool, dict]:
         self._check_action(action)
 
         terminated = False # Whether the agent reaches the target or hit the wall
@@ -179,7 +175,7 @@ class GridWorld:
 
 
 class GridReward:
-    def __init__(self, reward_table:np.ndarray):
+    def __init__(self, reward_table: np.ndarray):
         """
         Define a reward function using table values.
 
@@ -188,18 +184,18 @@ class GridReward:
         """
         self.reward_table = reward_table
 
-    def __call__(self, state:int, action:int) -> float:
+    def __call__(self, state: int, action: int) -> float:
         return self.reward_table[state, action]
 
 
 class SimulatedOracle:
     """Simulated (s, a) preference."""
-    def __init__(self, reward_model:Callable[[int, int], float], sigma_scale:float=1.0, gamma:float=0.0):
+    def __init__(self, reward_model: Callable[[int, int], float], sigma_scale: float=1.0, gamma: float=0.0):
         self.reward_model = reward_model
         self.sigma_scale = sigma_scale
         self.gamma = gamma
 
-    def compare(self, s1:int, a1:int, s0:int, a0:int, simulate:bool=False, n_repeats:int=10000) -> float:
+    def compare(self, s1: int, a1: int, s0: int, a0: int, simulate: bool=False, n_repeats: int=10000) -> float:
         """Give the preference of a state-action pair over another."""
         r1 = self.reward_model(s1, a1)
         r0 = self.reward_model(s0, a0)

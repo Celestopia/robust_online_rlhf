@@ -20,6 +20,7 @@ from p2r import P2R_Interface
 from ucbvi import UCBVI_BF
 from utils.log import get_logger, close_logger
 from utils.functions import moving_average_smoothing
+from utils.plot import draw_Q_table, draw_state_action_count, draw_trajectory_reward_curve, draw_query_count_curve, draw_action_count_curve
 
 from constants import GRID_SIZE, STATE_DIM, ACTION_DIM, TRAJECTORY_LENGTH, REWARD_VEC, EPSILON_0
 
@@ -29,10 +30,9 @@ def parse_args():
     parser = argparse.ArgumentParser()
     
     parser.add_argument('--seed', type=int, default=42, help='Random seed')
-    parser.add_argument('--trajectory_num', type=int, default=1000, help='Number of trajectories')
-    parser.add_argument('--trajectory_length', type=int, default=TRAJECTORY_LENGTH, help='Length of each trajectory')
-    parser.add_argument('--policy_epsilon', type=float, default=0.0, help='Epsilon-greedy exploration parameter') # not used
-    parser.add_argument('--policy_epsilon_decay', type=float, default=0.9995, help='Decay rate of epsilon-greedy exploration parameter') # not used
+    parser.add_argument('--result_dir', type=str, default='results', help='Directory to store all experiments')
+    parser.add_argument('-K', '--trajectory_num', type=int, default=1000, help='Number of trajectories')
+    parser.add_argument('-H', '--trajectory_length', type=int, default=TRAJECTORY_LENGTH, help='Length of each trajectory')
     parser.add_argument('--comparison_gamma', type=float, default=0.0, help='Noise level of comparison oracle')
     parser.add_argument('--ucbvi_delta', type=float, default=0.1, help='UCBVI delta parameter')
     parser.add_argument('--robust', action='store_true', help='Use robust P2R')
@@ -61,7 +61,7 @@ def main(args):
         epsilon_0=EPSILON_0
 
         # Set up the directory to store all experiments
-        result_dir = 'results'
+        result_dir = args.result_dir
         if not os.path.exists(result_dir):
             os.makedirs(result_dir, exist_ok=True)
             print("Result directory created at {}.".format(result_dir))
@@ -123,77 +123,70 @@ def main(args):
                     grid_size, state_dim, action_dim, trajectory_num, trajectory_length))
 
         trajectory_reward_list = [] # A list to store the reward of each trajectory
-        total_queries_list = []
-        epsilon=args.policy_epsilon
+        query_count_list = [] # A list to store the total number of queries
+        
+        final_state_count = np.zeros(state_dim, dtype=int) # final_state_count[s] represents the number of times the agent ends up in state s.
+        action_count = np.zeros(action_dim, dtype=int) # action_count[a] represents the number of times the agent takes action a.
+        action_count_lists = [[] for i in range(action_dim)] # action_count_lists[a][k] represents the number of times the agent takes action a up to the k-th iteration.
 
         for k in range(trajectory_num):
+            Q_k = ucbvi_bf.ucb_q_values(reward_estimator=p2r) # Shaped (H, S, A), the learned Q-value table at k-th iteration.
+            policy_table = ucbvi_bf.extract_policy(Q_k, epsilon=0.0) # Shaped (H, S, A), representing π_h(a|s).
+            policy = GridPolicy_h(policy_table) # Newest policy
 
-            trajectory_reward = 0.0
-
-            Q_k = ucbvi_bf.ucb_q_values(reward_estimator=p2r)
-            policy_table = ucbvi_bf.extract_policy(Q_k, epsilon=epsilon)
-            policy = GridPolicy_h(policy_table)
-
-            # Generate new episode
+            # Generate new episodes
             initial_state = env.reset()
             state = initial_state
             episode_tuples = []
-            action_chars = ''
-            for h in range(trajectory_length): # Generate new episodes by following the current policy
+            action_chars = '' # A string representing the actions taken in the current trajectory, e.g., '→↑o↑→'.
+            trajectory_reward = 0.0 # The total reward of the current trajectory, which consists of multiple (s, a) pairs.
+            for h in range(trajectory_length): # Generate a new trajectory by following the current policy
+                # Updating
                 action = policy(h, state)
                 state_prev = state
                 state, reward, terminated, truncated, info = env.step(action)
-                trajectory_reward += reward
+                
+                # Recording
                 episode_tuples.append((h, state_prev, action, state, reward))
+                trajectory_reward += reward
+                action_count[action] += 1
+                for a in range(action_dim):
+                    action_count_lists[a].append(action_count[a])
                 action_chars += env.action_to_char(action)
                 if terminated or truncated:
                     break
-
             ucbvi_bf.update_with_episode(episode_tuples) # Update UCBVI-BF memory with the new episodes
 
-            epsilon = epsilon * args.policy_epsilon_decay
+            # Recording
+            final_state_count[state] += 1
             trajectory_reward_list.append(trajectory_reward) # average reward per trajectory
-            total_queries_list.append(p2r.query_count)
+            query_count_list.append(p2r.query_count)
 
-            logging.info("Trajectory {:>7}; trajectory reward: {:>6.3f}; total query count: {:>4}; epsilon: {:>6.4f}; actions: [{}].".format(
-                k, trajectory_reward, p2r.query_count, epsilon, action_chars))
+            logging.info("Trajectory {:>7}; trajectory reward: {:>6.3f}; total query count: {:>4}; actions: [{}].".format(
+                k, trajectory_reward, p2r.query_count, action_chars))
+            
+            # Visualization
+            if k in [1000, 2500, 5000, 10000, 20000, 30000, 50000, 75000, 100000, 200000, 300000, 500000]:
+                Q_table_fig_save_path = os.path.join(experiment_dir, "Q_h_heatmap_{}.png".format(k))
+                draw_Q_table(Q_k, Q_table_fig_save_path)
+                logging.info("Q-table figure saved to {}.".format(Q_table_fig_save_path))
 
+                state_action_count_fig_save_path = os.path.join(experiment_dir, "state_action_count_heatmap_{}.png".format(k))
+                draw_state_action_count(ucbvi_bf.count_sa, state_action_count_fig_save_path)
+                logging.info("State-action count figure saved to {}.".format(state_action_count_fig_save_path))
 
         # Visualization
-        ## Heatmap of final state distribution
-        state_distribution_final = ucbvi_bf.count_hs[-1].reshape(grid_size, grid_size)
-        plt.figure(figsize=(8,8))
-        sns.heatmap(state_distribution_final, annot=True, fmt='d')
-        plt.title('Final state distribution')
-        plt.xlabel('x')
-        plt.ylabel('y')
-        fig_save_path = os.path.join(experiment_dir, "state_distribution_final.png")
-        plt.savefig(fig_save_path)
-        logging.info("State distribution figure saved to {}.".format(fig_save_path))
-        plt.close()
+        trajectory_reward_fig_save_path = os.path.join(experiment_dir, "trajectory_reward_curve.png")
+        draw_trajectory_reward_curve(trajectory_reward_list, trajectory_reward_fig_save_path)
+        logging.info("Trajectory reward curve figure saved to {}.".format(trajectory_reward_fig_save_path))
 
-        ## Metrics in the learning process
-        trajectory_reward_average = np.array(trajectory_reward_list).reshape(-1,20).mean(axis=-1) # average the rewards per 20 episodes
-        x_idx_selected = np.linspace(0, len(trajectory_reward_average)-1, 6, dtype=int)
-        trajectory_reward_average_smoothed = moving_average_smoothing(trajectory_reward_average, window_size=10)
-        plt.figure(figsize=(10,4))
-        plt.subplot(1,2,1)
-        plt.plot(trajectory_reward_average, label='Average trajectory reward over each 20 trajectories')
-        plt.plot(trajectory_reward_average_smoothed, label='Smoothed average trajectory reward (window_size=10)')
-        plt.xticks(x_idx_selected, (x_idx_selected+1)*20)
-        plt.xlabel('Trajectory')
-        plt.ylabel('Trajectory')
-        plt.title('Trajectory Reward Curve')
-        plt.subplot(1,2,2)
-        plt.plot(total_queries_list)
-        plt.xlabel('Trajectory')
-        plt.ylabel('Cumulative P2R queries')
-        plt.title('Human Preference Query Count')
-        plt.tight_layout()
-        fig_save_path = os.path.join(experiment_dir, "metrics.png")
-        plt.savefig(fig_save_path)
-        logging.info("Metrics figure saved to {}.".format(fig_save_path))
-        plt.close()
+        query_count_fig_save_path = os.path.join(experiment_dir, "query_count_curve.png")
+        draw_query_count_curve(query_count_list, query_count_fig_save_path)
+        logging.info("Query count curve figure saved to {}.".format(query_count_fig_save_path))
+
+        action_count_fig_save_path = os.path.join(experiment_dir, "action_count_curve.png")
+        draw_action_count_curve(action_count_lists, action_count_fig_save_path)
+        logging.info("Action count curve figure saved to {}.".format(action_count_fig_save_path))
 
         # Save objects
         object_dict = {}
@@ -207,14 +200,16 @@ def main(args):
         object_dict['p2r'] = p2r
         object_dict['ucbvi_bf'] = ucbvi_bf
         object_dict['trajectory_reward_list'] = trajectory_reward_list
-        object_dict['total_queries_list'] = total_queries_list
+        object_dict['query_count_list'] = query_count_list
+        object_dict['final_state_count'] = final_state_count
+        object_dict['action_count'] = action_count
+        object_dict['action_count_lists'] = action_count_lists
 
         object_dict_save_path = os.path.join(experiment_dir, "objects.pkl")
         pickle.dump(object_dict, open(object_dict_save_path, 'wb'))
         logging.info("Experiment objects saved to {}.".format(object_dict_save_path))
 
-        logging.info("Action distribution: {}".format(ucbvi_bf.count_sa.sum(axis=0)))
-
+        # Ending matters
         logging.info("Finished. Time elapsed: {:.2f}s.".format(time.time() - start_time))
         close_logger(logger)
         return 0

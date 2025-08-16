@@ -1,7 +1,6 @@
 # file: ucbvi.py
 import numpy as np
 import math
-import logging
 from typing import Callable, Tuple, List
 from utils.functions import get_variance
 
@@ -49,7 +48,7 @@ class UCBVI_BF:
             self.count_hs[h, s] += 1
 
     def get_P_hat(self, s:int, a:int) -> np.ndarray:
-        """Empirical estimate of P(y|s,a), the probability of transitioning to state `y` from state `x` given action `a`."""
+        """Empirical estimate of `P(s'|s,a)`, the probability of transitioning to state `s'` from state `s` given action `a`."""
         n = self.count_sa[s, a]
         if n == 0: # If (s, a) is unseen
             return np.ones(self.S) / self.S # Use uniform prior 
@@ -85,35 +84,47 @@ class UCBVI_BF:
         Run backward value-iteration for H steps to get optimistic Q values.
         
         Args:
-            reward_estimator: A function that takes (s, a) and returns a scalar reward.
+            reward_estimator: A function that takes an integer state `s`, an integer action `a`, and returns a scalar reward.
         
         Returns:
             Q (np.ndarray): Shaped (H, S, A), representing the learned Q-values. This is the undiscounted expected cumulative reward.
+                Each element represents `Q_h(s, a)`, the expected cumulative reward of taking action `a` at state `s` and step `h`.
         """
         H, S, A = self.H, self.S, self.A
         V = np.zeros((H + 1, S), dtype=float)
         Q = np.zeros((H, S, A), dtype=float)
-        Q_prev = self.Q.copy() # for computing bonus term
+        Q_prev = self.Q.copy() # Previous Q table
         
-        #logging.info("UCBVI-BF: Running backward value iteration to update Q values.")
         for h in reversed(range(H)): # H-1, H-2,..., 0
             for s in range(S):
                 for a in range(A):
-                    if self.count_sa[s,a] > 0:
+                    if self.count_sa[s,a] > 0: # If (s,a) is seen at least once
                         r_hat = reward_estimator(s, a)
                         P_hat = self.get_P_hat(s, a)
                         expected_v = P_hat.dot(V[h+1]) # expected value of next state
                         b = self.bonus_2(h, s, a, V[h+1]) # bonus term
                         q = r_hat + expected_v + b
-                        q = min(Q_prev[h,s,a], H-h, q) # Here H is replaced with H-h for a tighter bound
-                    else:
-                        q = self.H
+                        q = min(Q_prev[h,s,a], H - h, q) # Here H is replaced with H-h for a tighter bound
+                    else: # If (s, a) has never been seen before, assign a high Q value to boost exploration
+                        q = H -h # Here H is replaced with H-h for a tighter bound
                     Q[h, s, a] = q
                 V[h, s] = float(Q[h, s, :].max())
         self.Q = Q
         return Q
 
     def extract_policy(self, Q_table:np.ndarray, epsilon:float=0.0) -> np.ndarray: # ε-greedy policy from Q-values
+        """
+        Extract a policy table from given Q-values table, with time step conditioning.
+
+        Args:
+            Q_table (np.ndarray): Shaped (H, S, A). Each element represents `Q_h(s, a)`,
+                the expected cumulative reward of taking action `a` at state `s` and step `h`.
+            epsilon (float): Parameter for epsilon-greedy policy. The probability of taking a random action.
+
+        Returns:
+            policy_table (np.ndarray): Shaped (H, S, A). Each element represents `π_h(a|s)`,
+                the probability of taking action `a` at state `s` and step `h`.
+        """
         assert 0 <= epsilon < 1
         H, S, A = self.H, self.S, self.A
         policy_table = np.zeros((H, S, A), dtype=float)
