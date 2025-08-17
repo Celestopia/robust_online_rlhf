@@ -190,16 +190,15 @@ class GridReward:
 
 class SimulatedOracle:
     """Simulated (s, a) preference."""
-    def __init__(self, reward_model: Callable[[int, int], float], sigma_scale: float=1.0, gamma: float=0.0):
+    def __init__(self, reward_model: Callable[[int, int], float], gamma: float=0.0):
         self.reward_model = reward_model
-        self.sigma_scale = sigma_scale
         self.gamma = gamma
 
     def compare(self, s1: int, a1: int, s0: int, a0: int, simulate: bool=False, n_repeats: int=10000) -> float:
         """Give the preference of a state-action pair over another."""
         r1 = self.reward_model(s1, a1)
         r0 = self.reward_model(s0, a0)
-        p = logistic(r1 - r0, scale=self.sigma_scale)
+        p = logistic(r1 - r0)
         if not simulate: # If not running Bernoulli experiments
             if self.gamma > 0:
                 return p + self.gamma - 2 * p * self.gamma # Return the preference probability with noise

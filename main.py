@@ -2,28 +2,22 @@
 import os
 import sys
 import time
-import copy
 import random
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 import pickle
 import logging
 import traceback
 import argparse
-import yaml
-
 
 from env import GridWorld, SimulatedOracle, GridReward
 from policy import GridPolicy, GridPolicy_h
 from p2r import P2R_Interface
 from ucbvi import UCBVI_BF
 from utils.log import get_logger, close_logger
-from utils.functions import moving_average_smoothing
-from utils.plot import draw_Q_table, draw_state_action_count, draw_trajectory_reward_curve, draw_query_count_curve, draw_action_count_curve
+from utils.plot import (draw_Q_table, draw_state_action_count, draw_trajectory_reward_curve, draw_query_count_curve,
+                    draw_action_count_curve, draw_final_state_count)
 
-from constants import GRID_SIZE, STATE_DIM, ACTION_DIM, TRAJECTORY_LENGTH, REWARD_VEC, EPSILON_0
-
+from constants import GRID_SIZE, STATE_DIM, ACTION_DIM, TRAJECTORY_LENGTH, REWARD_VEC, EPSILON_0, DELTA
 
 
 def parse_args():
@@ -33,13 +27,11 @@ def parse_args():
     parser.add_argument('--result_dir', type=str, default='results', help='Directory to store all experiments')
     parser.add_argument('-K', '--trajectory_num', type=int, default=1000, help='Number of trajectories')
     parser.add_argument('-H', '--trajectory_length', type=int, default=TRAJECTORY_LENGTH, help='Length of each trajectory')
-    parser.add_argument('--comparison_gamma', type=float, default=0.0, help='Noise level of comparison oracle')
-    parser.add_argument('--ucbvi_delta', type=float, default=0.1, help='UCBVI delta parameter')
+    parser.add_argument('-G', '--comparison_gamma', type=float, default=0.0, help='Noise level of comparison oracle')
     parser.add_argument('--robust', action='store_true', help='Use robust P2R')
 
     args = parser.parse_args()
     return args
-
 
 
 def main(args):
@@ -59,6 +51,7 @@ def main(args):
         trajectory_num = args.trajectory_num
         trajectory_length = args.trajectory_length
         epsilon_0=EPSILON_0
+        delta = DELTA
 
         # Set up the directory to store all experiments
         result_dir = args.result_dir
@@ -113,7 +106,8 @@ def main(args):
                             )
         p2r.set_reference(initial_state,0)
 
-        ucbvi_bf = UCBVI_BF(state_dim=state_dim, action_dim=action_dim,trajectory_num=trajectory_num, trajectory_length=trajectory_length, delta=args.ucbvi_delta)
+        ucbvi_bf = UCBVI_BF(state_dim=state_dim, action_dim=action_dim,
+                            trajectory_num=trajectory_num, trajectory_length=trajectory_length, delta=delta)
 
         # --------------------------------------------------------------------------------
         # Main experiment
@@ -166,7 +160,7 @@ def main(args):
                 k, trajectory_reward, p2r.query_count, action_chars))
             
             # Visualization
-            if k in [1000, 2500, 5000, 10000, 20000, 30000, 50000, 75000, 100000, 200000, 300000, 500000]:
+            if k in [1000, 2500, 5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000, 2500000, 5000000] or k == trajectory_num-1:
                 Q_table_fig_save_path = os.path.join(experiment_dir, "Q_h_heatmap_{}.png".format(k))
                 draw_Q_table(Q_k, Q_table_fig_save_path)
                 logging.info("Q-table figure saved to {}.".format(Q_table_fig_save_path))
@@ -174,19 +168,6 @@ def main(args):
                 state_action_count_fig_save_path = os.path.join(experiment_dir, "state_action_count_heatmap_{}.png".format(k))
                 draw_state_action_count(ucbvi_bf.count_sa, state_action_count_fig_save_path)
                 logging.info("State-action count figure saved to {}.".format(state_action_count_fig_save_path))
-
-        # Visualization
-        trajectory_reward_fig_save_path = os.path.join(experiment_dir, "trajectory_reward_curve.png")
-        draw_trajectory_reward_curve(trajectory_reward_list, trajectory_reward_fig_save_path)
-        logging.info("Trajectory reward curve figure saved to {}.".format(trajectory_reward_fig_save_path))
-
-        query_count_fig_save_path = os.path.join(experiment_dir, "query_count_curve.png")
-        draw_query_count_curve(query_count_list, query_count_fig_save_path)
-        logging.info("Query count curve figure saved to {}.".format(query_count_fig_save_path))
-
-        action_count_fig_save_path = os.path.join(experiment_dir, "action_count_curve.png")
-        draw_action_count_curve(action_count_lists, action_count_fig_save_path)
-        logging.info("Action count curve figure saved to {}.".format(action_count_fig_save_path))
 
         # Save objects
         object_dict = {}
@@ -208,6 +189,23 @@ def main(args):
         object_dict_save_path = os.path.join(experiment_dir, "objects.pkl")
         pickle.dump(object_dict, open(object_dict_save_path, 'wb'))
         logging.info("Experiment objects saved to {}.".format(object_dict_save_path))
+
+        # Visualization
+        trajectory_reward_fig_save_path = os.path.join(experiment_dir, "trajectory_reward_curve.png")
+        draw_trajectory_reward_curve(trajectory_reward_list, trajectory_reward_fig_save_path)
+        logging.info("Trajectory reward curve figure saved to {}.".format(trajectory_reward_fig_save_path))
+
+        query_count_fig_save_path = os.path.join(experiment_dir, "query_count_curve.png")
+        draw_query_count_curve(query_count_list, query_count_fig_save_path)
+        logging.info("Query count curve figure saved to {}.".format(query_count_fig_save_path))
+
+        action_count_fig_save_path = os.path.join(experiment_dir, "action_count_curve.png")
+        draw_action_count_curve(action_count_lists, action_count_fig_save_path)
+        logging.info("Action count curve figure saved to {}.".format(action_count_fig_save_path))
+
+        final_state_count_fig_save_path = os.path.join(experiment_dir, "final_state_count_heatmap.png")
+        draw_final_state_count(final_state_count, final_state_count_fig_save_path)
+        logging.info("Final state count figure saved to {}.".format(final_state_count_fig_save_path))
 
         # Ending matters
         logging.info("Finished. Time elapsed: {:.2f}s.".format(time.time() - start_time))
