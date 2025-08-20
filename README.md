@@ -24,6 +24,7 @@ pip install -r requirements.txt
 
 ## Quick Start
 
+Under the root directory of this project, run:
 ```bash
 # run default experiment (without noise in comparison oracle)
 python main.py -K 100000
@@ -49,7 +50,7 @@ Command-line options:
 Each run of `main.py` creates a timestamped experiment directory under `./results/experiment_<timestamp>_<S>_<A>_<K>_<H>...`. The directory contains:
 * `objects.pkl`: Python pickle file containing the RL algorithm objects like `ucbvi_bf` and recording variable objects like `trajectory_reward_list`.
 * `log.log`: Log file of the experiment.
-* Plots
+* Plots: visualization of experiment running.
 
 
 ## Project Structure
@@ -101,7 +102,7 @@ Each experiment iteration `k = 1..K` does:
 
 1. **Planning**: The UCBVI-BF planner iterates over every $(h,s,a)$:
     - For each $(h,s,a)$, with the historical buffer of visited trajectories, use P2R to obtain a scalar reward estimate $\hat{r}(s,a)$.
-    - Compute $Q_{k,h}(s,a)=\min\Big(\hat{r}(s,a)+\hat{V}_{h+1}+\text{bonus}(h,s,a),Q_{k-1,h}(s,a),H-h\Big)$. Here `bonus` is Bernstein-Freedman style.
+    - Compute $Q_{k,h}(s,a)=\min\Big(\hat{r}(s,a)+\hat{V}_{h+1}+\text{bonus}(h,s,a), Q_{k-1,h}(s,a),H-h\Big)$. Here `bonus` is Bernstein-Freedman style.
     - Induce a greedy time-conditioned policy $\pi_k$ from the learned Q-values.
 
 2. **Execution**: run a single trajectory of length `H=5` under the current policy $\pi_k$. Record `(h,s,a,s',r)` tuples to UCBVI-BF buffer. Here the reward signals are unseen by the models and are only used for performance evaluation.
