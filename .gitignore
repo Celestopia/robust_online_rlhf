@@ -3,3 +3,8 @@ __pycache__/
 results/
 *.ipynb
 others/
+*.pdf
+*.png
+*.jpg
+*.csv
+*.xlsx

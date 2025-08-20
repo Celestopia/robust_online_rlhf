@@ -32,7 +32,7 @@ class UCBVI_BF:
         self.count_hsa = np.zeros((self.H, self.S, self.A), dtype=int) # Total visits to (s, a) at step h
         self.count_hs = np.zeros((self.H, self.S), dtype=int) # Total visits to state s at step h
 
-        self.Q = np.ones((self.H, self.S, self.A), dtype=float) # Q-values for each (h, s, a), to be implemented
+        self.Q = self.H * np.ones((self.H, self.S, self.A), dtype=float) # Q-values for each (h, s, a), to be implemented
 
     def update_with_episode(self, episode_tuples:List[Tuple[int, int, int, int, float]]):
         """

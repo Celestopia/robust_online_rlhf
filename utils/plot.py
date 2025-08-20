@@ -55,6 +55,7 @@ def draw_trajectory_reward_curve(trajectory_reward_list: List[float], fig_save_p
     trajectory_reward_average_smoothed = moving_average_smoothing(trajectory_reward_average, window_size=window_size)
     
     plt.figure(figsize=(8,6))
+    plt.ylim((2.0,4.2))
     plt.plot(trajectory_reward_average, label='Average trajectory reward (pool_size={})'.format(group_size))
     plt.plot(trajectory_reward_average_smoothed, label='Smoothed average trajectory reward (window_size={})'.format(window_size))
     plt.xticks(x_idx_selected, (x_idx_selected+1)*group_size)
@@ -79,7 +80,6 @@ def draw_query_count_curve(query_count_list: List[int], fig_save_path: str):
 
 
 def draw_action_count_curve(action_count_lists: List[List[int]], fig_save_path: str):
-    
     target_action = 1
     y = action_count_lists[target_action]
     x = np.arange(len(y))
@@ -87,6 +87,7 @@ def draw_action_count_curve(action_count_lists: List[List[int]], fig_save_path: 
     y_ref = x / 5
     plt.figure(figsize=(8,6))
     plt.axis([100, len(y), 10, len(y)*1.2])
+    plt.grid(True, which='major', linestyle='-', linewidth=0.5, color='grey')
     plt.plot(x, y, c='r', label='Optimal Action Count')
     plt.plot(x, y_opt, c='b', ls='--', label=r'$y=x$')
     plt.plot(x, y_ref, c='g', ls='--', label=r'$y=x/5$', alpha=0.3)

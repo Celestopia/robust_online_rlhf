@@ -109,13 +109,13 @@ def main(args):
         ucbvi_bf = UCBVI_BF(state_dim=state_dim, action_dim=action_dim,
                             trajectory_num=trajectory_num, trajectory_length=trajectory_length, delta=delta)
 
-        # --------------------------------------------------------------------------------
-        # Main experiment
+        # Main experiment ----------------------------------------------------------------------
         logging.info("Experiment {} started.".format(time_string))
         logging.info("Experiment directory: '{}'".format(experiment_dir))
         logging.info("grid_size: {}, state_dim: {}, action_dim: {}, trajectory_num: {}, trajectory_length: {}".format(
                     grid_size, state_dim, action_dim, trajectory_num, trajectory_length))
 
+        # Recording variables
         trajectory_reward_list = [] # A list to store the reward of each trajectory
         query_count_list = [] # A list to store the total number of queries
         
@@ -123,6 +123,7 @@ def main(args):
         action_count = np.zeros(action_dim, dtype=int) # action_count[a] represents the number of times the agent takes action a.
         action_count_lists = [[] for i in range(action_dim)] # action_count_lists[a][k] represents the number of times the agent takes action a up to the k-th iteration.
 
+        # Main experiment loop
         for k in range(trajectory_num):
             Q_k = ucbvi_bf.ucb_q_values(reward_estimator=p2r) # Shaped (H, S, A), the learned Q-value table at k-th iteration.
             policy_table = ucbvi_bf.extract_policy(Q_k, epsilon=0.0) # Shaped (H, S, A), representing π_h(a|s).
@@ -161,11 +162,11 @@ def main(args):
             
             # Visualization
             if k in [1000, 2500, 5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000, 2500000, 5000000] or k == trajectory_num-1:
-                Q_table_fig_save_path = os.path.join(experiment_dir, "Q_h_heatmap_{}.png".format(k))
+                Q_table_fig_save_path = os.path.join(experiment_dir, "Q_h_heatmap_{}.pdf".format(k))
                 draw_Q_table(Q_k, Q_table_fig_save_path)
                 logging.info("Q-table figure saved to {}.".format(Q_table_fig_save_path))
 
-                state_action_count_fig_save_path = os.path.join(experiment_dir, "state_action_count_heatmap_{}.png".format(k))
+                state_action_count_fig_save_path = os.path.join(experiment_dir, "state_action_count_heatmap_{}.pdf".format(k))
                 draw_state_action_count(ucbvi_bf.count_sa, state_action_count_fig_save_path)
                 logging.info("State-action count figure saved to {}.".format(state_action_count_fig_save_path))
 
@@ -191,19 +192,19 @@ def main(args):
         logging.info("Experiment objects saved to {}.".format(object_dict_save_path))
 
         # Visualization
-        trajectory_reward_fig_save_path = os.path.join(experiment_dir, "trajectory_reward_curve.png")
+        trajectory_reward_fig_save_path = os.path.join(experiment_dir, "trajectory_reward_curve.pdf")
         draw_trajectory_reward_curve(trajectory_reward_list, trajectory_reward_fig_save_path)
         logging.info("Trajectory reward curve figure saved to {}.".format(trajectory_reward_fig_save_path))
 
-        query_count_fig_save_path = os.path.join(experiment_dir, "query_count_curve.png")
+        query_count_fig_save_path = os.path.join(experiment_dir, "query_count_curve.pdf")
         draw_query_count_curve(query_count_list, query_count_fig_save_path)
         logging.info("Query count curve figure saved to {}.".format(query_count_fig_save_path))
 
-        action_count_fig_save_path = os.path.join(experiment_dir, "action_count_curve.png")
+        action_count_fig_save_path = os.path.join(experiment_dir, "action_count_curve.pdf")
         draw_action_count_curve(action_count_lists, action_count_fig_save_path)
         logging.info("Action count curve figure saved to {}.".format(action_count_fig_save_path))
 
-        final_state_count_fig_save_path = os.path.join(experiment_dir, "final_state_count_heatmap.png")
+        final_state_count_fig_save_path = os.path.join(experiment_dir, "final_state_count_heatmap.pdf")
         draw_final_state_count(final_state_count, final_state_count_fig_save_path)
         logging.info("Final state count figure saved to {}.".format(final_state_count_fig_save_path))
 
